@@ -1,6 +1,7 @@
 name: HeroProtection
 version: 1.o
-main: com.mcheroth.heropet.HeroProtection
+main: com.mcheroth.heroprotection.HeroProtection
 author: tauhoo
 commands: 
     heroprotect:
+    home:
