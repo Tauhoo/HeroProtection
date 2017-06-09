@@ -3,10 +3,12 @@ package com.mcheroth.heroprotection;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
+import org.bukkit.OfflinePlayer;
 import org.bukkit.World;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
@@ -45,8 +47,10 @@ public class HeroProtection extends JavaPlugin implements Listener{
 					player.sendMessage(ChatColor.RED+"คุณยังไม่ได้เซตบริเวรบ้านของคุณ");
 				}else{
 					Location loc = tool.StringToLocation(getConfig().getString("OwnerList."+player.getName()));
+					loc.setY(loc.getWorld().getHighestBlockYAt(loc.getBlockX(), loc.getBlockZ()));
 					player.teleport(loc);
 				}
+				return true;
 			}
 			if(args.length==1 && sender.isOp()){
 				Player p = Bukkit.getPlayer(args[0]);
@@ -56,8 +60,80 @@ public class HeroProtection extends JavaPlugin implements Listener{
 					Location loc = tool.StringToLocation(getConfig().getString("OwnerList."+player.getName()));
 					player.teleport(loc);
 				}
+				return true;
 			}
-			
+			if(args.length==2 && args[0].equals("add") ){
+				if(!check.checkPlayerHave(args[1])){
+					player.sendMessage(ChatColor.RED+"ไม่พบผู้เล่นนี้");
+					return false;
+				}
+				Player p = Bukkit.getPlayer(args[1]);
+				if(getConfig().getString("OwnerList."+player.getName()).equals("no")){
+					player.sendMessage(ChatColor.RED+"คุณยังไม่ได้เซตบริเวรบ้านของคุณ");
+				}else{
+					Location loc = tool.StringToLocation(getConfig().getString("OwnerList."+player.getName()));
+					List<String> sl = getConfig().getStringList("ProtectionList."+loc.getWorld().getName()+"."+tool.LocationToString(loc));
+					sl.add(p.getName());
+					getConfig().set("ProtectionList."+loc.getWorld().getName()+"."+tool.LocationToString(loc), sl);
+					saveConfig();
+					p.sendMessage(ChatColor.GREEN+"คุณถูกเพิ่มเป็นผู้อยู่อาศัยในบ้านของ"+findOwner(sl));
+					sender.sendMessage(ChatColor.GREEN+args[1]+"ถูกเพิ่มเป็นผู้อยู่อาศัยในบ้านคุณแล้ว");
+					
+				}
+				return true;
+			}
+			if(args.length==2 && args[0].equals("remove") ){
+				if(!check.checkPlayerHave(args[1])){
+					player.sendMessage(ChatColor.RED+"ไม่พบผู้เล่นนี้");
+					return false;
+				}
+				if(args[1].equals(player.getName()+" [Owner]")){
+					player.sendMessage("คุณไม่สามารถไล่ตัวเองที่เป็นเจ้าบ้านออกได้");
+					return false;
+				}
+				OfflinePlayer op = Bukkit.getOfflinePlayer(args[1]);
+				if(getConfig().getString("OwnerList."+player.getName()).equals("no")){
+					player.sendMessage(ChatColor.RED+"คุณยังไม่ได้เซตบริเวรบ้านของคุณ");
+				}else{
+					Location loc = tool.StringToLocation(getConfig().getString("OwnerList."+player.getName()));
+					List<String> sl = getConfig().getStringList("ProtectionList."+loc.getWorld().getName()+"."+tool.LocationToString(loc));
+					sl.remove(op.getName());
+					getConfig().set("ProtectionList."+loc.getWorld().getName()+"."+tool.LocationToString(loc), sl);
+					saveConfig();
+					if(op.isOnline()){
+						Player p = (Player) op;
+						p.sendMessage(ChatColor.GREEN+"คุณถูกไล่ออกจากการเป็นผู้อยู่อาศัยในบ้านของ"+findOwner(sl));
+					}
+					
+					sender.sendMessage(ChatColor.GREEN+args[1]+"ถูกไล่อกกจากการเป็นผู้อยู่อาศัยในบ้านคุณแล้ว");
+				}
+				return true;
+			}
+			if(args.length==1 && args[0].equals("removeall") ){
+				if(getConfig().getString("OwnerList."+player.getName()).equals("no")){
+					player.sendMessage(ChatColor.RED+"คุณยังไม่ได้เซตบริเวรบ้านของคุณ");
+				}else{
+					Location loc = tool.StringToLocation(getConfig().getString("OwnerList."+player.getName()));
+					List<String> sl = getConfig().getStringList("ProtectionList."+loc.getWorld().getName()+"."+tool.LocationToString(loc));
+					Iterator<String> itsl = sl.iterator();
+					while(itsl.hasNext()){
+						String name = itsl.next();
+						if(!name.contains(" [Owner]")){
+							OfflinePlayer op = Bukkit.getOfflinePlayer(name);
+							if(op.isOnline()){
+								Player p = (Player) op;
+								p.sendMessage(ChatColor.GREEN+"คุณถูกไล่ออกจากการเป็นผู้อยู่อาศัยในบ้านของ"+findOwner(sl));
+							}
+						}
+					}
+					sl.clear();
+					sl.add(player.getName()+" [Owner]");
+					getConfig().set("ProtectionList."+loc.getWorld().getName()+"."+tool.LocationToString(loc), sl);
+					saveConfig();
+					sender.sendMessage(ChatColor.GREEN+"คนอื่นๆถูกไล่อกกจากการเป็นผู้อยู่อาศัยในบ้านคุณแล้ว");
+				}
+				return true;
+			}
 			return true;
 		}
 		if(!sender.isOp())return false;
@@ -116,12 +192,23 @@ public class HeroProtection extends JavaPlugin implements Listener{
 				Iterator<Player> itPlayer = w.getPlayers().iterator();
 				while(itPlayer.hasNext()){
 					Player player = itPlayer.next();
-					String ownerArea = check.checkAreaOwner(this, player.getLocation());
-					WarningPlayerArea(player,playerArea.get(player),ownerArea);
-					playerArea.replace(player, ownerArea);
+					List<String> ownerArea = check.checkAreaOwner(this, player.getLocation());
+					String ownerString = findOwner(ownerArea);
+					WarningPlayerArea(player,playerArea.get(player),ownerString);
+					playerArea.replace(player,ownerString);
 				}
 			}
 		}
+	}
+	public String findOwner(List<String> sl){
+		Iterator<String> sit = sl.iterator();
+		while(sit.hasNext()){
+			String ps = sit.next();
+			if(ps.contains(" [Owner]")){
+				return ps.replace(" [Owner]", "");
+			}
+		}
+		return "no";
 	}
 	public void WarningPlayerArea(Player player,String areaOld,String areaNew){
 		if(areaOld.equals(areaNew))return;

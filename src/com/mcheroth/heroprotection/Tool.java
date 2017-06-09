@@ -41,7 +41,7 @@ public class Tool {
 		return null;
 	}
 	public ItemStack ProtectionStone(){
-		ItemStack ProtectionStone = new ItemStack(Material.ARMOR_STAND);
+		ItemStack ProtectionStone = new ItemStack(Material.OBSIDIAN);
 		ItemMeta ProtectionStoneMeta = ProtectionStone.getItemMeta();
 		ArrayList<String> lore = new ArrayList<String>();
 		lore.add(ChatColor.GRAY+"วางบล้อกนี้เพื่อสร้างอนาเขตบ้าน");
